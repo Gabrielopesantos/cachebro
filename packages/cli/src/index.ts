@@ -27,10 +27,72 @@ if (!command || command === "serve") {
   console.log(`  Tokens saved (total):   ~${stats.tokensSaved.toLocaleString()}`);
 
   await cache.close();
+} else if (command === "init") {
+  const { existsSync, readFileSync, writeFileSync, mkdirSync } = await import("fs");
+  const { join } = await import("path");
+  const { homedir } = await import("os");
+
+  const home = homedir();
+  const mcpEntry = {
+    command: "npx",
+    args: ["cachebro", "serve"],
+  };
+
+  const targets = [
+    {
+      name: "Claude Code",
+      path: join(home, ".claude.json"),
+    },
+    {
+      name: "Cursor",
+      path: join(home, ".cursor", "mcp.json"),
+    },
+    {
+      name: "Windsurf",
+      path: join(home, ".codeium", "windsurf", "mcp_config.json"),
+    },
+  ];
+
+  let configured = 0;
+
+  for (const target of targets) {
+    // Only configure tools that are already installed (config dir exists)
+    const dir = join(target.path, "..");
+    if (!existsSync(dir)) continue;
+
+    let config: any = {};
+    if (existsSync(target.path)) {
+      try {
+        config = JSON.parse(readFileSync(target.path, "utf-8"));
+      } catch {
+        config = {};
+      }
+    }
+
+    if (config.mcpServers?.cachebro) {
+      console.log(`  ${target.name}: already configured`);
+      configured++;
+      continue;
+    }
+
+    config.mcpServers = config.mcpServers ?? {};
+    config.mcpServers.cachebro = mcpEntry;
+    writeFileSync(target.path, JSON.stringify(config, null, 2) + "\n");
+    console.log(`  ${target.name}: configured (${target.path})`);
+    configured++;
+  }
+
+  if (configured === 0) {
+    console.log("No supported tools detected. You can manually add cachebro to your MCP config:");
+    console.log(JSON.stringify({ mcpServers: { cachebro: mcpEntry } }, null, 2));
+  } else {
+    console.log(`\nDone! Restart your editor to pick up cachebro.`);
+  }
 } else if (command === "help" || command === "--help") {
   console.log(`cachebro - Agent file cache with diff tracking
 
 Usage:
+  cachebro init      Auto-configure cachebro for your editor
   cachebro serve     Start the MCP server (default)
   cachebro status    Show cache statistics
   cachebro help      Show this help message

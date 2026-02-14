@@ -48,13 +48,22 @@ The cache persists in a local [Turso](https://turso.tech) (SQLite-compatible) da
 ## Installation
 
 ```bash
-npx cachebro serve    # just works, no install needed
+npx cachebro init     # auto-configures Claude Code, Cursor, Windsurf
 ```
 
-Or install globally:
+That's it. Restart your editor and cachebro is active. Agents discover it automatically.
 
-```bash
-npm install -g cachebro
+Or configure manually — add to your MCP config (`.claude.json`, `.cursor/mcp.json`, etc.):
+
+```json
+{
+  "mcpServers": {
+    "cachebro": {
+      "command": "npx",
+      "args": ["cachebro", "serve"]
+    }
+  }
+}
 ```
 
 ## Usage
