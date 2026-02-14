@@ -62,12 +62,6 @@ if (!command || command === "serve") {
       entry: mcpServersEntry,
     },
     {
-      name: "Windsurf",
-      path: join(home, ".codeium", "windsurf", "mcp_config.json"),
-      key: "mcpServers",
-      entry: mcpServersEntry,
-    },
-    {
       name: "OpenCode",
       path: join(xdgConfig, "opencode", "opencode.json"),
       key: "mcp",
