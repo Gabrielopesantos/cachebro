@@ -70,19 +70,6 @@ Or configure manually — add to your MCP config (`.claude.json`, `.cursor/mcp.j
 
 ### As an MCP server (recommended)
 
-Add to your `.claude/settings.json`, `.cursor/mcp.json`, or any MCP-compatible agent config:
-
-```json
-{
-  "mcpServers": {
-    "cachebro": {
-      "command": "npx",
-      "args": ["cachebro", "serve"]
-    }
-  }
-}
-```
-
 The MCP server exposes 4 tools:
 
 | Tool | Description |
