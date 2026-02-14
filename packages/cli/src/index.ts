@@ -33,23 +33,45 @@ if (!command || command === "serve") {
   const { homedir } = await import("os");
 
   const home = homedir();
-  const mcpEntry = {
+
+  // mcpServers format (Claude Code, Cursor, Windsurf)
+  const mcpServersEntry = {
     command: "npx",
     args: ["cachebro", "serve"],
   };
+
+  // opencode format (mcp key, command is a single array)
+  const opencodeMcpEntry = {
+    type: "local" as const,
+    command: ["npx", "cachebro", "serve"],
+  };
+
+  const xdgConfig = process.env.XDG_CONFIG_HOME || join(home, ".config");
 
   const targets = [
     {
       name: "Claude Code",
       path: join(home, ".claude.json"),
+      key: "mcpServers",
+      entry: mcpServersEntry,
     },
     {
       name: "Cursor",
       path: join(home, ".cursor", "mcp.json"),
+      key: "mcpServers",
+      entry: mcpServersEntry,
     },
     {
       name: "Windsurf",
       path: join(home, ".codeium", "windsurf", "mcp_config.json"),
+      key: "mcpServers",
+      entry: mcpServersEntry,
+    },
+    {
+      name: "OpenCode",
+      path: join(xdgConfig, "opencode", "opencode.json"),
+      key: "mcp",
+      entry: opencodeMcpEntry,
     },
   ];
 
@@ -69,14 +91,14 @@ if (!command || command === "serve") {
       }
     }
 
-    if (config.mcpServers?.cachebro) {
+    if (config[target.key]?.cachebro) {
       console.log(`  ${target.name}: already configured`);
       configured++;
       continue;
     }
 
-    config.mcpServers = config.mcpServers ?? {};
-    config.mcpServers.cachebro = mcpEntry;
+    config[target.key] = config[target.key] ?? {};
+    config[target.key].cachebro = target.entry;
     writeFileSync(target.path, JSON.stringify(config, null, 2) + "\n");
     console.log(`  ${target.name}: configured (${target.path})`);
     configured++;
@@ -84,7 +106,7 @@ if (!command || command === "serve") {
 
   if (configured === 0) {
     console.log("No supported tools detected. You can manually add cachebro to your MCP config:");
-    console.log(JSON.stringify({ mcpServers: { cachebro: mcpEntry } }, null, 2));
+    console.log(JSON.stringify({ mcpServers: { cachebro: mcpServersEntry } }, null, 2));
   } else {
     console.log(`\nDone! Restart your editor to pick up cachebro.`);
   }
