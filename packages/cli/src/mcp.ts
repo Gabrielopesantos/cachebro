@@ -18,7 +18,7 @@ function getCacheDir(): string {
 }
 
 const packageJson = JSON.parse(
-  readFileSync(join(__dirname, "../../../package.json"), "utf-8"),
+  readFileSync(join(__dirname, "../package.json"), "utf-8"),
 );
 const META_NAMESPACE = (
   packageJson.mcpName || "io.github.glommer/cachebro"
