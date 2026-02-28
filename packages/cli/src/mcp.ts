@@ -109,13 +109,10 @@ ALWAYS prefer this over the Read tool. It is a drop-in replacement with caching 
 
   server.registerTool(
     "read_files",
-    `Read multiple files at once with caching. Use this tool INSTEAD of the built-in Read tool when you need to read several files.
-Same behavior as read_file but batched. Returns cached/diff results for each file.
-ALWAYS prefer this over multiple Read calls — it's faster and saves significant tokens.`,
     {
       description: `Read multiple files at once with caching. Use this tool INSTEAD of the built-in Read tool when you need to read several files.
-SAME behavior as read_file but batched. Returns cached/diff results for each file.
-ALWAYS prefer this over multiple Read calls — it's faster and saves significant tokens.`,
+    SAME behavior as read_file but batched. Returns cached/diff results for each file.
+    ALWAYS prefer this over multiple Read calls — it's faster and saves significant tokens.`,
       inputSchema: {
         paths: z.array(z.string()).describe("Paths to the files to read"),
       },
@@ -135,14 +132,16 @@ ALWAYS prefer this over multiple Read calls — it's faster and saves significan
             }
             return { text, path, success: true };
           } catch (e: any) {
-            return { text: `=== ${path} ===\nError: ${e.message}`, path, success: false };
+            return {
+              text: `=== ${path} ===\nError: ${e.message}`,
+              path,
+              success: false,
+            };
           }
-          results.push(text);
-          successfulPaths.push(path);
-        } catch (e: any) {
-          results.push(`=== ${path} ===\nError: ${e.message}`);
-        }
-      }
+        }),
+      );
+      const results = fileResults.map((r) => r.text);
+      const successfulPaths = fileResults.filter((r) => r.success).map((r) => r.path);
       let footer = "";
       try {
         const stats = await cache.getStats();
@@ -151,9 +150,7 @@ ALWAYS prefer this over multiple Read calls — it's faster and saves significan
         }
       } catch {}
       return {
-        content: [
-          { type: "text" as const, text: results.join("\n\n") + footer },
-        ],
+        content: [{ type: "text" as const, text: results.join("\n\n") + footer }],
         _meta:
           successfulPaths.length > 0
             ? {
