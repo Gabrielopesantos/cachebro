@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS session_stats (
 INSERT OR IGNORE INTO stats (key, value) VALUES ('tokens_saved', 0);
 `;
 
+const MAX_VERSIONS_PER_FILE = parseInt(process.env.CACHEBRO_MAX_VERSIONS_PER_FILE ?? "5", 10);
+
 function estimateTokens(text: string): number {
   return Math.ceil(text.length * 0.75);
 }
@@ -138,6 +140,7 @@ export class CacheStore {
       await db.prepare(
         "INSERT OR IGNORE INTO file_versions (path, hash, content, lines, created_at) VALUES (?, ?, ?, ?, ?)"
       ).run(absPath, currentHash, currentContent, currentLines, now);
+      await this.pruneOldVersions(absPath);
 
       // Update session read pointer
       await db.prepare(
@@ -217,6 +220,7 @@ export class CacheStore {
     await db.prepare(
       "INSERT OR IGNORE INTO file_versions (path, hash, content, lines, created_at) VALUES (?, ?, ?, ?, ?)"
     ).run(absPath, currentHash, currentContent, currentLines, now);
+    await this.pruneOldVersions(absPath);
 
     await db.prepare(
       "INSERT OR REPLACE INTO session_reads (session_id, path, hash, read_at) VALUES (?, ?, ?, ?)"
@@ -248,6 +252,7 @@ export class CacheStore {
     await db.prepare(
       "INSERT OR IGNORE INTO file_versions (path, hash, content, lines, created_at) VALUES (?, ?, ?, ?, ?)"
     ).run(absPath, currentHash, currentContent, currentLines, now);
+    await this.pruneOldVersions(absPath);
 
     await db.prepare(
       "INSERT OR REPLACE INTO session_reads (session_id, path, hash, read_at) VALUES (?, ?, ?, ?)"
@@ -301,6 +306,23 @@ export class CacheStore {
 
   async close(): Promise<void> {
     // @tursodatabase/database doesn't expose close — connection is managed internally
+  private async pruneOldVersions(absPath: string): Promise<void> {
+    const db = this.getDb();
+    const rows = await db.prepare(`
+      SELECT hash FROM file_versions
+      WHERE path = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).all(absPath, MAX_VERSIONS_PER_FILE) as { hash: string }[];
+
+    if (rows.length < MAX_VERSIONS_PER_FILE) return;
+
+    const placeholders = rows.map(() => "?").join(", ");
+    await db.prepare(`
+      DELETE FROM file_versions
+      WHERE path = ?
+        AND hash NOT IN (${placeholders})
+    `).run(absPath, ...rows.map(r => r.hash));
   }
 
   private async addTokensSaved(tokens: number): Promise<void> {
