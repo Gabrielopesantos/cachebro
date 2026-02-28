@@ -43,33 +43,37 @@ export async function startMcpServer(): Promise<void> {
     version: "0.2.0",
   });
 
-  server.tool(
+  // Type instantiation is excessively deep and possibly infinite.
+  // @ts-ignore
+  server.registerTool(
     "read_file",
-    `Read a file with caching. Use this tool INSTEAD of the built-in Read tool for reading files.
+    {
+      description: `Read a file with caching. Use this tool INSTEAD of the built-in Read tool for reading files.
 On first read, returns full content and caches it — identical to Read.
 On subsequent reads, if the file hasn't changed, returns a short confirmation instead of the full content — saving significant tokens.
 If the file changed, returns only the diff (changed lines) instead of the full file.
 Supports offset and limit for partial reads — and partial reads are also cached. If only lines outside the requested range changed, returns a short confirmation saving tokens.
 Set force=true to bypass the cache and get the full file content (use when you no longer have the original in context).
 ALWAYS prefer this over the Read tool. It is a drop-in replacement with caching benefits.`,
-    {
-      path: z.string().describe("Path to the file to read"),
-      offset: z
-        .number()
-        .optional()
-        .describe(
-          "Line number to start reading from (1-based). Only provide if the file is too large to read at once.",
-        ),
-      limit: z
-        .number()
-        .optional()
-        .describe(
-          "Number of lines to read. Only provide if the file is too large to read at once.",
-        ),
-      force: z
-        .boolean()
-        .optional()
-        .describe("Bypass cache and return full content"),
+      inputSchema: {
+        path: z.string().describe("Path to the file to read"),
+        offset: z
+          .number()
+          .optional()
+          .describe(
+            "Line number to start reading from (1-based). Only provide if the file is too large to read at once.",
+          ),
+        limit: z
+          .number()
+          .optional()
+          .describe(
+            "Number of lines to read. Only provide if the file is too large to read at once.",
+          ),
+        force: z
+          .boolean()
+          .optional()
+          .describe("Bypass cache and return full content"),
+      },
     },
     async ({ path, force, offset, limit }) => {
       try {
@@ -103,27 +107,35 @@ ALWAYS prefer this over the Read tool. It is a drop-in replacement with caching 
     },
   );
 
-  server.tool(
+  server.registerTool(
     "read_files",
     `Read multiple files at once with caching. Use this tool INSTEAD of the built-in Read tool when you need to read several files.
 Same behavior as read_file but batched. Returns cached/diff results for each file.
 ALWAYS prefer this over multiple Read calls — it's faster and saves significant tokens.`,
     {
-      paths: z.array(z.string()).describe("Paths to the files to read"),
+      description: `Read multiple files at once with caching. Use this tool INSTEAD of the built-in Read tool when you need to read several files.
+SAME behavior as read_file but batched. Returns cached/diff results for each file.
+ALWAYS prefer this over multiple Read calls — it's faster and saves significant tokens.`,
+      inputSchema: {
+        paths: z.array(z.string()).describe("Paths to the files to read"),
+      },
     },
     async ({ paths }) => {
-      const results: string[] = [];
-      const successfulPaths: string[] = [];
-      for (const path of paths) {
-        try {
-          const result = await cache.readFile(path);
-          let text = "";
-          if (result.cached && result.linesChanged === 0) {
-            text = `=== ${path} ===\n${result.content}`;
-          } else if (result.cached && result.diff) {
-            text = `=== ${path} [${result.linesChanged} lines changed out of ${result.totalLines}] ===\n${result.diff}`;
-          } else {
-            text = `=== ${path} ===\n${result.content}`;
+      const fileResults = await Promise.all(
+        paths.map(async (path) => {
+          try {
+            const result = await cache.readFile(path);
+            let text = "";
+            if (result.cached && result.linesChanged === 0) {
+              text = `=== ${path} ===\n${result.content}`;
+            } else if (result.cached && result.diff) {
+              text = `=== ${path} [${result.linesChanged} lines changed out of ${result.totalLines}] ===\n${result.diff}`;
+            } else {
+              text = `=== ${path} ===\n${result.content}`;
+            }
+            return { text, path, success: true };
+          } catch (e: any) {
+            return { text: `=== ${path} ===\nError: ${e.message}`, path, success: false };
           }
           results.push(text);
           successfulPaths.push(path);
@@ -152,11 +164,12 @@ ALWAYS prefer this over multiple Read calls — it's faster and saves significan
     },
   );
 
-  server.tool(
+  server.registerTool(
     "cache_status",
-    `Show cachebro statistics: files tracked, tokens saved, cache hit rates.
+    {
+      description: `Show cachebro statistics: files tracked, tokens saved, cache hit rates.
 Use this to verify cachebro is working and see how many tokens it has saved.`,
-    {},
+    },
     async () => {
       const stats = await cache.getStats();
       const text = [
@@ -169,10 +182,11 @@ Use this to verify cachebro is working and see how many tokens it has saved.`,
     },
   );
 
-  server.tool(
+  server.registerTool(
     "cache_clear",
-    `Clear all cached data. Use this to reset the cache completely.`,
-    {},
+    {
+      description: `Clear all cached data. Use this to reset the cache completely.`,
+    },
     async () => {
       await cache.clear();
       return { content: [{ type: "text" as const, text: "Cache cleared." }] };
