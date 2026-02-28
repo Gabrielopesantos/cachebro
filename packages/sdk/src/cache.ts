@@ -57,6 +57,8 @@ export class CacheStore {
   private sessionId: string;
   private readonly: boolean;
   private initialized = false;
+  private pendingContents = new Map<string, string>();
+  private pendingHashes = new Map<string, string>();
 
   constructor(config: CacheConfig) {
     this.dbPath = config.dbPath;
@@ -90,8 +92,17 @@ export class CacheStore {
     const absPath = resolve(filePath);
     statSync(absPath); // throws if file doesn't exist
 
-    const currentContent = readFileSync(absPath, "utf-8");
-    const currentHash = contentHash(currentContent);
+    let currentContent: string;
+    let currentHash: string;
+    if (this.pendingContents.has(absPath)) {
+      currentContent = this.pendingContents.get(absPath)!;
+      currentHash = this.pendingHashes.get(absPath)!;
+      this.pendingContents.delete(absPath);
+      this.pendingHashes.delete(absPath);
+    } else {
+      currentContent = readFileSync(absPath, "utf-8");
+      currentHash = contentHash(currentContent);
+    }
     const allLines = currentContent.split("\n");
     const currentLines = allLines.length;
     const now = Date.now();
@@ -278,8 +289,17 @@ export class CacheStore {
     };
   }
 
-  async onFileChanged(_filePath: string): Promise<void> {
-    // Hash check in readFile handles staleness detection.
+  async onFileChanged(filePath: string): Promise<void> {
+    const { readFileSync } = await import("fs");
+    const { resolve } = await import("path");
+    const absPath = resolve(filePath);
+    try {
+      const content = readFileSync(absPath, "utf-8");
+      this.pendingContents.set(absPath, content);
+      this.pendingHashes.set(absPath, contentHash(content));
+    } catch {
+      // File in transient state — let readFile re-read normally
+    }
   }
 
   async onFileDeleted(filePath: string): Promise<void> {
@@ -289,6 +309,8 @@ export class CacheStore {
     const absPath = resolve(filePath);
     await db.prepare("DELETE FROM file_versions WHERE path = ?").run(absPath);
     await db.prepare("DELETE FROM session_reads WHERE path = ?").run(absPath);
+    this.pendingContents.delete(absPath);
+    this.pendingHashes.delete(absPath);
   }
 
   async getStats(): Promise<CacheStats> {
