@@ -5,6 +5,8 @@ export interface CacheConfig {
   sessionId: string;
   /** Directories to watch for file changes. Defaults to cwd. */
   watchPaths?: string[];
+  /** Open database in read-only mode (shared lock, safe for concurrent readers) */
+  readonly?: boolean;
 }
 
 export interface FileReadResult {

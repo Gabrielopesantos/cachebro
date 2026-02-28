@@ -18,7 +18,7 @@ if (!command || command === "serve") {
     process.exit(0);
   }
 
-  const { cache } = createCache({ dbPath, sessionId: "cli-status" });
+  const { cache } = createCache({ dbPath, sessionId: "cli-status", readonly: true });
   await cache.init();
   const stats = await cache.getStats();
 

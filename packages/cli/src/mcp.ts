@@ -196,9 +196,11 @@ Use this to verify cachebro is working and see how many tokens it has saved.`,
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  process.on("SIGINT", () => {
+  const cleanup = async () => {
     watcher.close();
-    cache.close();
+    await cache.close();
     process.exit(0);
-  });
+  };
+  process.on("SIGINT", cleanup);
+  process.on("SIGTERM", cleanup);
 }

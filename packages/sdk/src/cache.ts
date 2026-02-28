@@ -4,6 +4,11 @@ import type { CacheConfig, CacheStats, FileReadResult } from "./types.js";
 import { createHash } from "crypto";
 
 const SCHEMA = `
+-- Allow concurrent reads while a write is in progress (separate processes don't block each other)
+PRAGMA journal_mode=WAL;
+-- Retry for up to 5s on lock contention instead of failing immediately
+PRAGMA busy_timeout=5000;
+
 CREATE TABLE IF NOT EXISTS file_versions (
   path        TEXT NOT NULL,
   hash        TEXT NOT NULL,
@@ -50,17 +55,24 @@ export class CacheStore {
   private db: Awaited<ReturnType<typeof connect>> | null = null;
   private dbPath: string;
   private sessionId: string;
+  private readonly: boolean;
   private initialized = false;
 
   constructor(config: CacheConfig) {
     this.dbPath = config.dbPath;
     this.sessionId = config.sessionId;
+    this.readonly = config.readonly ?? false;
   }
 
   async init(): Promise<void> {
     if (this.initialized) return;
-    this.db = await connect(this.dbPath);
-    await this.db.exec(SCHEMA);
+    this.db = await connect(this.dbPath, {
+      readonly: this.readonly,
+      ...(this.readonly ? {} : { timeout: 5000 }),
+    });
+    if (!this.readonly) {
+      await this.db.exec(SCHEMA);
+    }
     this.initialized = true;
   }
 
@@ -306,6 +318,13 @@ export class CacheStore {
 
   async close(): Promise<void> {
     // @tursodatabase/database doesn't expose close — connection is managed internally
+    if (this.db) {
+      await this.db.close();
+      this.db = null;
+      this.initialized = false;
+    }
+  }
+
   private async pruneOldVersions(absPath: string): Promise<void> {
     const db = this.getDb();
     const rows = await db.prepare(`
