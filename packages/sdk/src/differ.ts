@@ -14,9 +14,15 @@ export interface DiffResult {
   changedNewLines: Set<number>;
 }
 
+const LARGE_FILE_THRESHOLD = parseInt(process.env.CACHEBRO_LARGE_FILE_THRESHOLD ?? "1000", 10);
+
 export function computeDiff(oldContent: string, newContent: string, filePath: string): DiffResult {
   const oldLines = oldContent.split("\n");
   const newLines = newContent.split("\n");
+
+  if (LARGE_FILE_THRESHOLD > 0 && (oldLines.length > LARGE_FILE_THRESHOLD || newLines.length > LARGE_FILE_THRESHOLD)) {
+    return computeDiffHeuristic(oldLines, newLines, filePath);
+  }
 
   // LCS-based diff
   const lcs = longestCommonSubsequence(oldLines, newLines);
@@ -115,6 +121,37 @@ export function computeDiff(oldContent: string, newContent: string, filePath: st
   const header = `--- a/${filePath}\n+++ b/${filePath}`;
   return {
     diff: `${header}\n${hunks.join("\n")}`,
+    linesChanged,
+    hasChanges: true,
+    changedNewLines,
+  };
+}
+
+function computeDiffHeuristic(oldLines: string[], newLines: string[], filePath: string): DiffResult {
+  const oldSet = new Set(oldLines);
+  const newSet = new Set(newLines);
+  let linesChanged = 0;
+  const changedNewLines = new Set<number>();
+
+  for (let i = 0; i < newLines.length; i++) {
+    if (!oldSet.has(newLines[i])) {
+      changedNewLines.add(i + 1);
+      linesChanged++;
+    }
+  }
+
+  for (const line of oldLines) {
+    if (!newSet.has(line)) {
+      linesChanged++;
+    }
+  }
+
+  if (linesChanged === 0) {
+    return { diff: "", linesChanged: 0, hasChanges: false, changedNewLines };
+  }
+
+  return {
+    diff: `@@ large file: ~${linesChanged} lines changed (exact diff skipped for performance) @@`,
     linesChanged,
     hasChanges: true,
     changedNewLines,
