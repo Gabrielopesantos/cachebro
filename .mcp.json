@@ -1,11 +1,3 @@
 {
-  "mcpServers": {
-    "cachebro": {
-      "command": "bun",
-      "args": ["run", "/Users/glaubercosta/new-experiments/cachebro/packages/cli/src/index.ts"],
-      "env": {
-        "CACHEBRO_DIR": "/Users/glaubercosta/new-experiments/.cachebro"
-      }
-    }
-  }
+  "mcpServers": {}
 }

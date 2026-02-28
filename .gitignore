@@ -6,4 +6,4 @@ dist/
 *.db-wal
 *.db-shm
 bun.lockb
-.tmp_test/
+.tmp_test*/
